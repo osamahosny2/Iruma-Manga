@@ -30,4 +30,4 @@ dependencyResolutionManagement {
 }
 
 include(":app")
-rootProject.name = "Kotatsu"
+rootProject.name = "Iruma-Manga"

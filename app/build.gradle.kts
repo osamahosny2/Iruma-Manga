@@ -41,11 +41,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.github.kotatsu.next"
+        applicationId = "com.aistudio.irumamanga.rkfpxq.next"
         minSdk = 23
         targetSdk = 37
-        versionCode = 2045
-        versionName = "9.9.4"
+        versionCode = 10400
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "org.koitharu.kotatsu.HiltTestRunner"
 
@@ -67,7 +67,8 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
+            // Keep the package identity stable across successive Iruma debug builds.
+            // A stable signing key is still required for upgrades across CI runners.
         }
         release {
             isMinifyEnabled = true
