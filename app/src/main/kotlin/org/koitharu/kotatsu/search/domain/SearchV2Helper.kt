@@ -13,11 +13,7 @@ import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaListFilter
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.parsers.model.SortOrder
-import org.koitharu.kotatsu.parsers.util.almostEquals
-import org.koitharu.kotatsu.parsers.util.levenshteinDistance
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
-
-private const val MATCH_THRESHOLD_DEFAULT = 0.2f
 
 class SearchV2Helper @AssistedInject constructor(
     @Assisted private val source: MangaSource,
@@ -30,16 +26,17 @@ class SearchV2Helper @AssistedInject constructor(
         if (settings.isNsfwContentDisabled && source.isNsfw()) {
             return null
         }
+        val cleanedQuery = query.trim().replace(Regex("\s+"), " ")
         val repository = mangaRepositoryFactory.create(source)
-        val listFilter = repository.getFilter(query, kind) ?: return null
+        val listFilter = repository.getFilter(cleanedQuery, kind) ?: return null
         val sortOrder = repository.getSortOrder(kind)
         val list = repository.getList(0, sortOrder, listFilter)
         if (list.isEmpty()) {
             return null
         }
         val result = list.toMutableList()
-        result.postFilter(query, kind)
-        result.sortByRelevance(query, kind)
+        result.postFilter(cleanedQuery, kind)
+        result.sortByRelevance(cleanedQuery, kind)
         return SearchResults(listFilter = listFilter, sortOrder = sortOrder, manga = result)
     }
 
@@ -80,15 +77,20 @@ class SearchV2Helper @AssistedInject constructor(
             removeAll { it.isNsfw() }
         }
         when (kind) {
-            SearchKind.TITLE -> retainAll { m ->
-                m.matches(query, MATCH_THRESHOLD_DEFAULT)
+            SearchKind.TITLE -> {
+                // Preserve source results if strict local matching would otherwise hide everything.
+                val closeMatches = filter { manga -> IrumaSearchRanking.isTitleMatch(manga, query) }
+                if (closeMatches.isNotEmpty()) {
+                    clear()
+                    addAll(closeMatches)
+                }
             }
 
-            SearchKind.AUTHOR -> retainAll { m ->
-                m.authors.isEmpty() || m.authors.contains(query, ignoreCase = true)
+            SearchKind.AUTHOR -> retainAll { manga ->
+                manga.authors.isEmpty() || manga.authors.contains(query, ignoreCase = true)
             }
 
-            SearchKind.SIMPLE, // no filtering expected
+            SearchKind.SIMPLE,
             SearchKind.TAG,
             -> Unit
         }
@@ -98,16 +100,14 @@ class SearchV2Helper @AssistedInject constructor(
         when (kind) {
             SearchKind.SIMPLE,
             SearchKind.TITLE,
-            -> sortBy { m ->
-                minOf(m.title.levenshteinDistance(query), m.altTitle?.levenshteinDistance(query) ?: Int.MAX_VALUE)
+            -> sortBy { manga -> IrumaSearchRanking.score(manga, query) }
+
+            SearchKind.AUTHOR -> sortByDescending { manga ->
+                manga.authors.contains(query, ignoreCase = true)
             }
 
-            SearchKind.AUTHOR -> sortByDescending { m ->
-                m.authors.contains(query, ignoreCase = true)
-            }
-
-            SearchKind.TAG -> sortByDescending { m ->
-                m.tags.any { tag -> tag.title.equals(query, ignoreCase = true) }
+            SearchKind.TAG -> sortByDescending { manga ->
+                manga.tags.any { tag -> tag.title.equals(query, ignoreCase = true) }
             }
         }
     }
@@ -127,10 +127,6 @@ class SearchV2Helper @AssistedInject constructor(
             defaultSortOrder
         }
     }
-
-    private fun Manga.matches(query: String, threshold: Float): Boolean = matchesTitles(title, query, threshold) || matchesTitles(altTitle, query, threshold)
-
-    private fun matchesTitles(a: String?, b: String?, threshold: Float): Boolean = !a.isNullOrEmpty() && !b.isNullOrEmpty() && a.almostEquals(b, threshold)
 
     @AssistedFactory
     interface Factory {
