@@ -26,7 +26,7 @@ internal object IrumaSearchRanking {
             .replace('ى', 'ي')
             .replace('ؤ', 'و')
             .replace('ئ', 'ي')
-            .replace(Regex("\s+"), " ")
+            .replace(Regex("\\s+"), " ")
             .trim()
     }
 

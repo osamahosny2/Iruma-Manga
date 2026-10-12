@@ -26,7 +26,7 @@ class SearchV2Helper @AssistedInject constructor(
         if (settings.isNsfwContentDisabled && source.isNsfw()) {
             return null
         }
-        val cleanedQuery = query.trim().replace(Regex("\s+"), " ")
+        val cleanedQuery = query.trim().replace(Regex("\\s+"), " ")
         val repository = mangaRepositoryFactory.create(source)
         val listFilter = repository.getFilter(cleanedQuery, kind) ?: return null
         val sortOrder = repository.getSortOrder(kind)
